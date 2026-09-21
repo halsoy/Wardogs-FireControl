@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PublishAot>true</PublishAot>
+    <AssemblyName>WardogsFireControl-Standalone</AssemblyName>
+    <ApplicationIcon>..\WardogsFireControl\Assets\bullseye.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="payload\WardogsFireControl-win-x64.zip" Condition="Exists('payload\WardogsFireControl-win-x64.zip')" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,82 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install .NET 9
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: dotnet restore tests/WardogsFireControl.Tests/WardogsFireControl.Tests.csproj
+
+      - name: Build
+        run: dotnet build tests/WardogsFireControl.Tests/WardogsFireControl.Tests.csproj -c Release --no-restore
+
+      - name: Run checks
+        run: dotnet run --project tests/WardogsFireControl.Tests/WardogsFireControl.Tests.csproj -c Release --no-build
+
+      - name: Publish portable Windows build
+        run: >-
+          dotnet publish src/WardogsFireControl/WardogsFireControl.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=false
+          -o publish/WardogsFireControl
+
+      - name: Create release archive
+        shell: pwsh
+        run: Compress-Archive -Path publish/WardogsFireControl/* -DestinationPath WardogsFireControl-win-x64.zip
+
+      - name: Embed portable payload in standalone launcher
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force src/WardogsFireControl.Launcher/payload | Out-Null
+          Copy-Item WardogsFireControl-win-x64.zip src/WardogsFireControl.Launcher/payload/WardogsFireControl-win-x64.zip
+
+      - name: Publish standalone executable
+        run: >-
+          dotnet publish src/WardogsFireControl.Launcher/WardogsFireControl.Launcher.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishAot=true
+          -o publish/Standalone
+
+      - name: Collect standalone executable
+        shell: pwsh
+        run: Copy-Item publish/Standalone/WardogsFireControl-Standalone.exe WardogsFireControl-Standalone.exe
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: WardogsFireControl-win-x64
+          path: |
+            WardogsFireControl-win-x64.zip
+            WardogsFireControl-Standalone.exe
+          if-no-files-found: error
+
+      - name: Publish tagged GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            WardogsFireControl-win-x64.zip
+            WardogsFireControl-Standalone.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
